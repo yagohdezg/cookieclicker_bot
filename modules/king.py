@@ -1,6 +1,8 @@
+import os
 import re
 import time
 import queue
+import pyfiglet
 
 from threading import Thread
 
@@ -11,15 +13,22 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.common.exceptions import (
+    StaleElementReferenceException,
+    JavascriptException
+)
 
 class King(object):
     def __init__(self, save_path: str = "") -> None:
         # Constructor variables
         self.save = save_path
+        
         # Driver
         service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=service)         
         self.driver.get('http://orteil.dashnet.org/cookieclicker/')
+        os.system('cls' if os.name=='nt' else 'clear')
+        print(pyfiglet.figlet_format("Cookie Clicker Automation SEX"))
 
         # Class variables
         self.clicker_queue = queue.Queue()
@@ -34,12 +43,6 @@ class King(object):
             self.driver.quit()
             
         lang.click()
-        
-        # Wait for page to load
-        while not re.search('loading', self.driver.page_source, re.IGNORECASE):
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, '//button[@id="bigCookie"]'))
-            )
 
         # Load save
         if self.save:
@@ -50,12 +53,17 @@ class King(object):
 
     def __load_save(self):
         cond = self.driver.execute_script('return Game.bakeryName ')
-        while not cond:
-            cond = self.driver.execute_script('return Game.bakeryName ')
+        while True:
+            try:
+                self.driver.execute_script(f'Game.ImportSaveCode("{self.save}")')
+                break
         
-        self.driver.execute_script(f'Game.ImportSaveCode("{self.save}")')
+            except JavascriptException: 
+                print("Can't load save, trying again in 0.5s")
+            
+            time.sleep(0.5)
     
-    def click_cookie(self):
+    def start_clicking_cookie(self):
         try:
             cookie = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, '//button[@id="bigCookie"]'))
@@ -65,15 +73,25 @@ class King(object):
             self.driver.quit()
 
         def cookie_clicker_thread(cookie):
-            while True:
+            cond = True
+            while cond:
                 if self.clicker_queue.empty():
-                    cookie.click()
-                
-                time.sleep(0.1)
+                    try:
+                        cookie.click()
+                    except StaleElementReferenceException:
+                        print("Error - Cookie not found")
+                        
+                elif self.clicker_queue.queue[0] == "STOP_CLICK_COOKIE":
+                    cond = False
+                time.sleep(0.01)
 
         thread = Thread(target=cookie_clicker_thread, args=(cookie,), daemon=True)
         thread.start()   
-
         
+    def stop_clicking_cookie(self):
+        self.clicker_queue.put("STOP_CLICK_COOKIE")
+    
+    def kill(self):
+        self.driver.quit()
     
      
