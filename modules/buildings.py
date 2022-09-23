@@ -1,48 +1,46 @@
 import copy
+import time
 
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.common.exceptions import (
+    JavascriptException
+)
+
 
 class Buildings(object):
-    def __init__(self, save: str) -> None:
-        self.save = save
+    def __init__(self, driver: webdriver.Chrome) -> None:
+        self.driver = driver
         self.buildings = {}
         self.cps_multiplier = 0
         
         self.__download_data()
         
     def __download_data(self):
-        # Configure selenium
-        options = Options()
-        options.headless = True
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-        
-        # Wait for page to load
-        driver.get("http://orteil.dashnet.org/cookieclicker/")
-        cond = driver.execute_script('return Game.bakeryName ')
-        while not cond:
-            cond = driver.execute_script('return Game.bakeryName ')
+        cond = True
+        while cond:
+            try:
+                buildings = self.driver.execute_script('return Object.keys(Game.Objects)')
+                cond = False
+            except JavascriptException:
+                print("Game not loaded, retrying in 0.5s")
+                
+            time.sleep(0.5)
             
-        # Obtain data
-        driver.execute_script(f'Game.ImportSaveCode("{self.save}")')
-        buildings = driver.execute_script('return Object.keys(Game.Objects)')
-        self.cps_multiplier = driver.execute_script('return Game.globalCpsMult')
+        self.cps_multiplier = self.driver.execute_script('return Game.globalCpsMult')
+        print(self.cps_multiplier)
         
         quantities = {
-            'amount': driver.execute_script(
+            'amount': self.driver.execute_script(
                 'var amount = {};Object.keys(Game.Objects).forEach(function(key)'+\
                 '{amount[key] = Game.Objects[key]["amount"]});return amount'
             ),
             
-            'price': driver.execute_script(
+            'price': self.driver.execute_script(
                 'var price = {};Object.keys(Game.Objects).forEach(function(key)'+\
                 '{price[key] = Game.Objects[key]["price"]});return price'
             ),
             
-            'cps': driver.execute_script(
+            'cps': self.driver.execute_script(
                 'var cps = {};Object.keys(Game.Objects).forEach(function(key)'+\
                 '{cps[key] = Game.Objects[key].cps(Game.Objects[key])});return cps'
             )
@@ -72,14 +70,3 @@ class Buildings(object):
             
             yield next, buildings[next]['amount']
             
-def main():
-    with open('save.txt', 'r') as file: 
-        save = file.read()
-    buildings = Buildings(save)
-    
-    for i, val in enumerate(buildings.best_next_n_buildings(50)):
-        print(f'{i}: {val}')
-
-if __name__ == '__main__':
-    main()
-        

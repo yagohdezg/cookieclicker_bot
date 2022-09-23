@@ -18,20 +18,23 @@ from selenium.common.exceptions import (
     JavascriptException
 )
 
+from modules.buildings import Buildings
+
 class King(object):
     def __init__(self, save_path: str = "") -> None:
         # Constructor variables
         self.save = save_path
+        
+        # Class variables
+        self.clicker_queue = queue.Queue()
+        self.buying_queue = queue.Queue()
         
         # Driver
         service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=service)         
         self.driver.get('http://orteil.dashnet.org/cookieclicker/')
         os.system('cls' if os.name=='nt' else 'clear')
-        print(pyfiglet.figlet_format("Cookie Clicker Automation SEX"))
-
-        # Class variables
-        self.clicker_queue = queue.Queue()
+        print(pyfiglet.figlet_format("Cookie Clicker Automation SEX"))        
         
         # Select language
         try:        
@@ -50,6 +53,8 @@ class King(object):
                 self.save = file.read()
                 
             self.__load_save()
+        
+        self.buildings = Buildings(self.driver)
 
     def __load_save(self):
         cond = self.driver.execute_script('return Game.bakeryName ')
@@ -94,4 +99,6 @@ class King(object):
     def kill(self):
         self.driver.quit()
     
+    def buildings(self):
+        return self.buildings
      
