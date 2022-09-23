@@ -25,9 +25,8 @@ class King(object):
         # Constructor variables
         self.save = save_path
         
-        # Class variables
+        # Queues
         self.clicker_queue = queue.Queue()
-        self.buying_queue = queue.Queue()
         
         # Driver
         service = Service(ChromeDriverManager().install())
@@ -54,7 +53,8 @@ class King(object):
                 
             self.__load_save()
         
-        self.buildings = Buildings(self.driver)
+        self.buildings = Buildings(self.driver, self.clicker_queue)
+        self.__start_worker_clicker()
 
     def __load_save(self):
         cond = self.driver.execute_script('return Game.bakeryName ')
@@ -68,7 +68,7 @@ class King(object):
             
             time.sleep(0.5)
     
-    def start_clicking_cookie(self):
+    def __start_worker_clicker(self):
         try:
             cookie = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, '//button[@id="bigCookie"]'))
@@ -76,26 +76,33 @@ class King(object):
         
         except:
             self.driver.quit()
-
-        def cookie_clicker_thread(cookie):
-            cond = True
-            while cond:
+            
+        def cookie_clicker_worker():
+            while True:
                 if self.clicker_queue.empty():
                     try:
                         cookie.click()
                     except StaleElementReferenceException:
                         print("Error - Cookie not found")
                         
-                elif self.clicker_queue.queue[0] == "STOP_CLICK_COOKIE":
-                    cond = False
+                else:
+                    work = self.clicker_queue.get()
+                    try:
+                        thing_to_click = WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, work))
+                        )
+                        thing_to_click.click()
+                    
+                    except:
+                        print(f"ATTENTION: Couldn't click {work}")
+                        
+                    self.clicker_queue.task_done()
+                    
                 time.sleep(0.01)
 
-        thread = Thread(target=cookie_clicker_thread, args=(cookie,), daemon=True)
-        thread.start()   
+        thread = Thread(target=cookie_clicker_worker, args=(), daemon=True)
+        thread.start() 
         
-    def stop_clicking_cookie(self):
-        self.clicker_queue.put("STOP_CLICK_COOKIE")
-    
     def kill(self):
         self.driver.quit()
     
