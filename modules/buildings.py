@@ -1,3 +1,4 @@
+import sys
 import copy
 import queue
 import time
@@ -20,7 +21,8 @@ class Buildings(object):
         self.wait = WebDriverWait(self.driver, 10, 1, ignored_exceptions=JavascriptException)
         
         self.__download_data()
-        self.__start_buying()
+        self.__start_buying_buildings()
+        self.__start_buying_upgrades()
         
     def __download_data(self):
         
@@ -71,19 +73,39 @@ class Buildings(object):
     #         buildings[next]['amount'] += 1
     #         buildings[next]['price'] *= 1.15
             
-    def __start_buying(self):
+    def __start_buying_buildings(self):
         def worker_buyer_thread():
             while True:
                 if self.clicker_queue.empty():
                     next = self.best_next_building(self.buildings)
                     capital = self.driver.execute_script('return Game.cookies')
+
+                    sys.stdout.write("\033[K")
+                    print(f'Currently buying: {next}', end='\r')
+                    sys.stdout.flush()
                     
                     if capital >= self.buildings[next]['price']:
-                        self.clicker_queue.put(
-                            '//div[@id="product{id}"]'.format(
-                                id=list(self.buildings.keys()).index(next)))
+                        self.clicker_queue.put(f"Objects.{next}")
                         
                         self.add_building(next)
+                                   
+                time.sleep(1)
+                
+        thread = Thread(target=worker_buyer_thread, args=(), daemon=True)
+        thread.start() 
+
+    def __start_buying_upgrades(self):
+        def worker_buyer_thread():
+            while True:
+                upgrades = self.driver.execute_script('return Game.UpgradesInStore.length')
+                
+                if upgrades != 0:
+                    capital = self.driver.execute_script('return Game.cookies')
+                    upgrade = self.driver.execute_script('return Game.UpgradesInStore[0]["basePrice"]')
+                    if capital >= upgrade:
+                        self.clicker_queue.put(f"UpgradesInStore[0]")
+                        time.sleep(1)
+                        self.__download_data()
                                    
                 time.sleep(1)
                 

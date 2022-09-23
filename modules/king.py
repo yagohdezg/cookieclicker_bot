@@ -55,6 +55,7 @@ class King(object):
         
         self.buildings = Buildings(self.driver, self.clicker_queue)
         self.__start_worker_clicker()
+        self.__thread_save_data()
 
     def __load_save(self):
         cond = self.driver.execute_script('return Game.bakeryName ')
@@ -69,38 +70,39 @@ class King(object):
             time.sleep(0.5)
     
     def __start_worker_clicker(self):
-        try:
-            cookie = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, '//button[@id="bigCookie"]'))
-            )
-        
-        except:
-            self.driver.quit()
-            
         def cookie_clicker_worker():
             while True:
                 if self.clicker_queue.empty():
                     try:
-                        cookie.click()
-                    except StaleElementReferenceException:
+                        self.driver.execute_script('Game.ClickCookie()')
+                    except JavascriptException:
                         print("Error - Cookie not found")
                         
                 else:
                     work = self.clicker_queue.get()
-                    try:
-                        thing_to_click = WebDriverWait(self.driver, 10).until(
-                            EC.presence_of_element_located((By.XPATH, work))
-                        )
-                        thing_to_click.click()
+                    self.driver.execute_script(f'Game.{work}.buy()')
                     
-                    except:
-                        print(f"ATTENTION: Couldn't click {work}")
+                    # except:
+                    #     print(f"ATTENTION: Couldn't click {work}")
                         
                     self.clicker_queue.task_done()
                     
                 time.sleep(0.01)
 
         thread = Thread(target=cookie_clicker_worker, args=(), daemon=True)
+        thread.start() 
+
+    def __thread_save_data(self):
+        def save_data():
+            while True:
+                save = self.driver.execute_script('return Game.WriteSave(1)')
+                file_path = os.path.join('.', 'local_save.txt')
+                with open(file_path, 'w+') as file:
+                    file.write(save)
+                
+                time.sleep(60)
+
+        thread = Thread(target=save_data, args=(), daemon=True)
         thread.start() 
         
     def kill(self):
