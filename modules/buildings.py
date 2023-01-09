@@ -62,17 +62,6 @@ class Buildings(object):
         _max = max(ratios, key=lambda key: ratios[key])
         return _max
     
-    # def best_next_n_buildings(self, n: int):
-    #     buildings = copy.deepcopy(self.buildings)
-        
-    #     for k in range(n):
-    #         next = self.best_next_building(buildings)
-                        
-    #         yield next, buildings[next]['price']
-            
-    #         buildings[next]['amount'] += 1
-    #         buildings[next]['price'] *= 1.15
-            
     def __start_buying_buildings(self):
         def worker_buyer_thread():
             while True:
